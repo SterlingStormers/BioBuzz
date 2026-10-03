@@ -24,6 +24,12 @@ android {
     }
 }
 
+repositories {
+    maven { url = "https://mymaven.bylazar.com/releases" }
+    maven { url = "https://jitpack.io" }
+}
+
 dependencies {
     implementation project(':FtcRobotController')
+    implementation 'com.github.helotyr:Slipstream:v1.0.4'
 }
