@@ -1,91 +1,82 @@
 package com.slipstream;
 
-import com.pedropathing.math.Pose;
-import com.pedropathing.paths.Path;
-import com.pedropathing.paths.curves.Curve;
+
+import com.pedropathing.math.Vector2D;
+import com.pedropathing.paths.PathSegment;
+import com.pedropathing.utils.Angle;
 
 public class VelocityProfile {
 
     private final SlipstreamConfig config;
 
+    // Arrays for the backward pass results
+    public double[] tValues;
+    public double[] maxSpeeds;
+
+    // Output values (what gets passed to ADRC)
+    public double vx;
+    public double vy;
+    public double omega;
+
     public VelocityProfile(SlipstreamConfig config) {
         this.config = config;
     }
 
-    /**
-     * Walks backward from endpoint (t=1.0) to currentT.
-     * At each sample, applies 3-axis friction ellipse to find max feasible speed.
-     * Returns max speed at currentT.
-     */
-    public double compute(Path path, double currentT) {
+    public void compute(PathSegment segment, double currentT) {
 
-        Curve curve = path.curve;
-        double t = currentT;
+        int samples = 101;
+        tValues = new double[samples];
+        maxSpeeds = new double[samples];
 
-        int spaces = (int) Math.round((1.0 - t) * 100);
-        double[] samples = new double[spaces + 1];
-
-        for (int i = spaces; i >= 0; i--) {
-            samples[i] = 1.0 - (i / 100.0); //need decimal .0
-            double aheadT = samples[i];
-            double solveT = samples[i-1];
-            Pose poseAtAheadT = activePath.getPath(0).getPose(aheadT);
-            double aheadX = poseAtAheadT.getX();
-            double aheadY = poseAtAheadT.getY();
-            Pose poseAtSolveT = activePath.getPath(0).getPose(solveT);
-            double solveX = poseAtSolveT.getX();
-            double solveY = poseAtSolveT.getY();
-            double distance = Math.hypot(aheadX - solveX, aheadY - solveY);
-
-
-
+        // T values match indices: tValues[i] = i / 100.0
+        for (int i = 0; i < samples; i++) {
+            tValues[i] = i / 100.0;
         }
 
+        // Endpoint: robot stops at t=1.0 (index 100)
+        maxSpeeds[100] = 0;
 
-        // Figure out how many samples to walk through
-        // Based on parameter span from currentT to 1.0
+        // Find robot's current index
+        int currentIndex = (int) Math.round(currentT * 100);
+
+        // Walk backward from 99 down to currentIndex
+        for (int i = 99; i >= currentIndex; i--) {
+            double hereT = tValues[i];
+            double prevT = tValues[i + 1];       // previously computed T (one iteration ago)
+            double prevSpeed = maxSpeeds[i + 1]; // previously computed speed (one iteration ago)
+            // Distance
+            Vector2D herePos = segment.curve.get(hereT);
+            Vector2D prevPos = segment.curve.get(prevT);
+            double distance = Math.hypot(prevPos.x() - herePos.x(), prevPos.y() - herePos.y());
+            // Curvature
+            double curvature = segment.curve.curvature(hereT);
+            // Rotation Rate
+            double hereHeading = segment.heading(hereT);
+            double prevHeading = segment.heading(prevT);
+            double headingChange = Math.abs(Angle.normalizeSigned(prevHeading - hereHeading));
+            double rotationRate;
+            if (distance == 0) {
+                rotationRate = headingChange / 0.001;
+            } else {
+                rotationRate = headingChange / distance;
+            }
 
 
-        // Initialize at endpoint (t = 1.0)
-        // Robot stops at endpoint, so nextSpeed = 0
+            maxSpeeds[i] = solveEllipse(distance, curvature, rotationRate, prevSpeed, config.gripBudget.get(), config.robotSize.get());
+        }
 
-
-        // Walk backward: from t = 1.0 toward currentT
-        // At each sample, solve ellipse to get max speed here
-        // Roll state so this sample becomes "next" for the following iteration
-
-
-        return 0;  // return max speed at currentT once loop finishes
     }
 
-    /**
-     * Solves the friction ellipse quadratic for max feasible speed at this sample.
-     *
-     * Formula: A*W² + B*W + C = 0 where W = speed²
-     * A = 4 * distance² * curvature² + 1
-     * B = 4 * distance² * rotationRate² * robotSize² - 2 * nextSpeed²
-     * C = nextSpeed⁴ - 4 * distance² * gripBudget²
-     *
-     * Returns speed = sqrt(W). Returns 0 if infeasible.
-     */
-    private double solveEllipse(double distance, double curvature, double rotationRate,
-                                double nextSpeed, double gripBudget, double robotSize) {
-
-        // Compute A, B, C coefficients
-
-
-        // Compute discriminant
-
-
-        // If discriminant negative, return 0 (infeasible)
-
-
-        // Solve quadratic for W
-
-
-        // Return sqrt(W), guarding against negative W
-
-
-        return 0;
+    private double solveEllipse(double distance, double curvature, double rotationRate, double prevSpeed, double gripBudget, double robotSize) {
+        double distanceSquare = distance * distance;
+        double rotationRateQuad = rotationRate * rotationRate * rotationRate * rotationRate;
+        double prevSpeedQuad = prevSpeed * prevSpeed * prevSpeed * prevSpeed;
+        double A = (4 * distanceSquare * (curvature * curvature)) + 1 + (4 * distanceSquare * rotationRateQuad * (robotSize * robotSize));
+        double B = -(2 * (prevSpeed * prevSpeed));
+        double C = prevSpeedQuad - (4 * distanceSquare * (gripBudget * gripBudget));
+        double discrim = (B * B) - (4 * A * C);
+        if (discrim < 0) return 0;
+        double W = (-B + Math.sqrt(discrim)) / (2 * A);
+        return Math.sqrt(W);
     }
 }
