@@ -19,36 +19,12 @@ import org.firstinspires.ftc.robotcore.internal.camera.delegating.DelegatingCapt
 
 public class DriveTrain extends LinearOpMode {
     private ElapsedTime runtime = new ElapsedTime();
-    private boolean kickerUp = false;
-    private boolean kickerStart = false;
-    private double kickerStartTime = 0.0;
-    private boolean yWasPressed = false;
-    private boolean spindexerMoving = false;
-    private int COUNTS = 1365;
-    private int SPIN_ACCOUNT = 0;
-    private int offsetCounts = 0;
-    private int comparableThreshold = 0;
-    private double SPIN_POWER = -0.2;
-    private int currentSpin = 0;
-    private ElapsedTime shooterSpinupTimer = new ElapsedTime();
-    private boolean shooterRunning = false;
-    private static final double SPINUP_DELAY = 1.9;     // wait 2s for wheel to spin up
-    private static final double KICKER_RETURN_TIME = 0.35;
     public DcMotor frontLeftDrive = null;
     public DcMotor backLeftDrive = null;
     public DcMotor frontRightDrive = null;
     public DcMotor backRightDrive = null;
     public DcMotor intakeMotor = null;
     public DcMotor shooterMotor = null;
-    public CRServo spindexer = null;
-    public SensorGoBildaPinpoint odom = null;
-    public Servo kicker = null;
-    private double kickerPos = 0;
-    public Servo servo0 = null;
-    public Servo servo1 = null;
-    public Servo servo2 = null;
-    public Servo servo3 = null;
-    public CRServo servo4 = null;
 
     @Override
     public void runOpMode() {
@@ -56,10 +32,6 @@ public class DriveTrain extends LinearOpMode {
         backLeftDrive = hardwareMap.get(DcMotor.class, "back_left_drive");
         frontRightDrive = hardwareMap.get(DcMotor.class, "front_right_drive");
         backRightDrive = hardwareMap.get(DcMotor.class, "back_right_drive");
-        intakeMotor = hardwareMap.get(DcMotor.class, "intake_motor");
-        spindexer = hardwareMap.get(CRServo.class, "spindexer_servo");
-        shooterMotor = hardwareMap.get(DcMotor.class, "shooter_motor");
-        kicker = hardwareMap.get(Servo.class, "kicker_servo");
 
         //To be changed
 
@@ -67,10 +39,6 @@ public class DriveTrain extends LinearOpMode {
         backLeftDrive.setDirection(DcMotor.Direction.REVERSE);
         frontRightDrive.setDirection(DcMotor.Direction.FORWARD);
         backRightDrive.setDirection(DcMotor.Direction.FORWARD);
-        intakeMotor.setDirection(DcMotor.Direction.FORWARD);
-        shooterMotor.setDirection(DcMotor.Direction.REVERSE);
-        spindexer.setDirection(CRServo.Direction.FORWARD);
-        kicker.setDirection(Servo.Direction.REVERSE);
 
         frontLeftDrive.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
         frontRightDrive.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
@@ -83,11 +51,6 @@ public class DriveTrain extends LinearOpMode {
         telemetry.addData("Status", "Initialized");
         telemetry.update();
 
-        kicker.setPosition(1);
-        kickerPos = kicker.getPosition();
-
-        intakeMotor.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
-        intakeMotor.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
 
         ElapsedTime shooterTimer = new ElapsedTime();
 
@@ -124,31 +87,6 @@ public class DriveTrain extends LinearOpMode {
                 frontRightPower /= max;
                 backLeftPower /= max;
                 backRightPower /= max;
-            }
-
-            // intake
-            if (gamepad2.x) {
-                intakeMotor.setPower(1);
-            } else if (gamepad2.b) {
-                intakeMotor.setPower(-0.5);
-            } else {
-                intakeMotor.setPower(0);
-            }
-
-            if (gamepad2.right_bumper) {
-                COUNTS = 2729;
-                telemetry.addData("rightBumper", true);
-                telemetry.update();
-            } else {
-                COUNTS = 1365;
-            }
-
-            if (gamepad2.left_bumper) {
-                SPIN_POWER = -0.2;
-                telemetry.addData("negative", true);
-                telemetry.update();
-            } else {
-                SPIN_POWER = 0.2;
             }
 
             frontLeftDrive.setPower(frontLeftPower * modifier);
